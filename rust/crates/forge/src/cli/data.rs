@@ -255,14 +255,14 @@ fn other(cmd: &str, args: Vec<String>) -> Result<(), Fail> {
 			println!("{}", out.summary(&file));
 		}
 		_ => {
-			let kv = pairs(args, &["--root", "--addons", "--wowsims", "--built-at"])?;
+			let kv = pairs(args, &["--root", "--addons", "--built-at"])?;
 			let get = |k: &str| kv.iter().rev().find(|(a, _)| a == k).map(|(_, v)| v.clone());
 			let root = get("--root").map(abs).or(root).ok_or_else(|| usage("--root <dir> is required (no checkout above here)"))?;
 			let built_at = match get("--built-at") {
 				Some(b) => build::parse_iso(&b)?,
 				None => build::now_iso(),
 			};
-			let o = forge_data::gear::Options { root: root.clone(), addons: get("--addons").map(abs), wowsims_cache: get("--wowsims").map(abs), built_at };
+			let o = forge_data::gear::Options { root: root.clone(), addons: get("--addons").map(abs), built_at };
 			let out = forge_data::gear::build(&o)?;
 			for (rel, text) in &out.files {
 				let f = root.join(rel);

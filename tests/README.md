@@ -112,8 +112,8 @@ modules meet. New client APIs go in the stub of the module that needs them;
 reference data in the `data/forever` shape (`dsl/data`, `questdb`, `route`,
 `find/data`), packs good and bad (`packs`), cached source tables
 (`data/sources`, `professions/wago`, `travel/sources`), recordings,
-installed-addon samples (`codex/addons`, `dungeonjournal`,
-`consume/wowsims`), simulator inputs (`sim`) and six compiled guides frozen
+installed-addon samples (`codex/addons`, `dungeonjournal`),
+simulator inputs (`sim`) and six compiled guides frozen
 for the guide menu scenes of `preview` and `text-fit.test.js` (`preview`).
 
 ## Tests that need local data

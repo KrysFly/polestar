@@ -7,18 +7,6 @@
 		"rust/crates/forge/src/pack-spec.json": {
 			"kind": "excluded",
 			"reason": "the pack check's own list of words a public pack must never contain"
-		},
-		"rust/tests/golden/gear/input/root/data/sources/wowsims/classic/7779ebbf79dc7f1341e6ab939b28a3402c9a730a/ui/mage/presets.ts": {
-			"kind": "excluded",
-			"reason": "verbatim upstream wowsims source (MIT) used as a golden input; its own comments link the site"
-		},
-		"rust/tests/golden/gear/input/root/data/sources/wowsims/classic/7779ebbf79dc7f1341e6ab939b28a3402c9a730a/ui/rogue/presets.ts": {
-			"kind": "excluded",
-			"reason": "verbatim upstream wowsims source (MIT) used as a golden input; its own comments link the site"
-		},
-		"rust/tests/golden/gear/input/root/data/sources/wowsims/classic/7779ebbf79dc7f1341e6ab939b28a3402c9a730a/ui/warrior/presets.ts": {
-			"kind": "excluded",
-			"reason": "verbatim upstream wowsims source (MIT) used as a golden input; its own comments link the site"
 		}
 	}
 }

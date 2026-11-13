@@ -3,31 +3,28 @@
 //!   addon/Polestar_ItemDB/Forever.lua      ForeverLevelingBiS: Forever item stats over the Era
 //!                                          table, quest reward choices
 //!   addon/Polestar_ItemDB/Polestar_ItemDB.toc, LICENSE-DATA.txt
-//!   addon/Polestar/Gear/SpecData.lua       weight bands (Polestar + wowsims), racials
+//!   addon/Polestar/Gear/SpecData.lua       racial gear traits
 //!   addon/Polestar/Gear/LICENSE-DATA.txt
 //!   data/forever/gear/report.json          counts and provenance (`builtAt` from Options)
-//! Reads the installed ForeverLevelingBiS, addon/Polestar_ItemDB/Items.lua (`forge data itemdb`),
-//! addon/Polestar/Gear/Weights.lua and the wowsims cache (data/sources/wowsims). Offline.
+//! Reads the installed ForeverLevelingBiS and addon/Polestar_ItemDB/Items.lua (`forge data itemdb`).
+//! Offline. The stat weights (addon/Polestar/Gear/WeightBands.lua) are not built here.
 
 pub mod addonlua;
 pub mod flb;
 pub mod leveling;
 pub mod specdata;
-pub mod wowsims;
 
 use std::path::{Path, PathBuf};
 
-use forge_guide::js::{stringify, to_fixed, Arr, Obj, V};
+use forge_guide::js::{stringify, to_fixed, Obj, V};
 
 pub const ITEMDB: &str = "Polestar_ItemDB";
 
 pub struct Options {
-	/// The checkout: addon/, package.json, data/sources/wowsims.
+	/// The checkout: addon/, package.json.
 	pub root: PathBuf,
 	/// The client's Interface/AddOns (None: detected, as tools/lib/addons.js resolveAddonsDir).
 	pub addons: Option<PathBuf>,
-	/// The wowsims cache (None: <root>/data/sources/wowsims).
-	pub wowsims_cache: Option<PathBuf>,
 	/// report.json builtAt (ISO 8601, as `new Date().toISOString()` prints it).
 	pub built_at: String,
 }
@@ -92,7 +89,6 @@ fn resolve_addons_dir(explicit: Option<&Path>) -> Option<PathBuf> {
 /// buildGear -> the files and the report.
 pub fn build(opts: &Options) -> Result<Output, String> {
 	let root = &opts.root;
-	let mut gaps: Vec<String> = Vec::new();
 	let mut warnings: Vec<String> = Vec::new();
 	let item_dir = root.join("addon").join(ITEMDB);
 	let era_file = item_dir.join("Items.lua");
@@ -110,27 +106,9 @@ pub fn build(opts: &Options) -> Result<Output, String> {
 	let flb_licence = read_text(&flb_dir.join("LICENSE"))?;
 	let item_licence = notice("Forever.lua holds facts derived from ForeverLevelingBiS by Thunder:", &flb_licence);
 
-	// 2. wowsims (the cache only)
-	let sim_cache = opts.wowsims_cache.clone().unwrap_or_else(|| root.join("data").join("sources").join("wowsims"));
-	let ws = match wowsims::read_wowsims(&sim_cache) {
-		Ok(w) => Some(w),
-		Err(e) => {
-			gaps.push(format!("wowsims: {e}; the bands are Polestar's own weights"));
-			warnings.push(format!("wowsims: not used ({e})"));
-			None
-		}
-	};
-
-	// 3. SpecData.lua and its notices
-	let authored = specdata::authored_weights(&root.join("addon").join("Polestar").join("Gear").join("Weights.lua"))?;
-	let (bands, band_counts) = specdata::weight_bands(ws.as_ref(), &authored);
-	let spec_data = specdata::emit_spec_data(&bands, &specdata::racials(&flb.racials), ws.is_some(), &flb.meta.get("version"));
-	let mut parts = vec![notice("SpecData.lua: racial gear traits derived from ForeverLevelingBiS by Thunder:", &flb_licence)];
-	let ws_licence = sim_cache.join(wowsims::licence_rel());
-	if ws.is_some() && ws_licence.exists() {
-		parts.push(notice("SpecData.lua: stat weights derived from wowsims (https://github.com/wowsims):", &read_text(&ws_licence)?));
-	}
-	let gear_licence = parts.join("\n");
+	// 2. SpecData.lua and its notice
+	let spec_data = specdata::emit_spec_data(&specdata::racials(&flb.racials), &flb.meta.get("version"));
+	let gear_licence = notice("SpecData.lua: racial gear traits derived from ForeverLevelingBiS by Thunder:", &flb_licence);
 
 	let report = Obj::new();
 	report.set("builtAt", V::str(&opts.built_at));
@@ -141,27 +119,13 @@ pub fn build(opts: &Options) -> Result<Output, String> {
 	fm.set("pack", pack.counts.to_v());
 	fm.set("bytes", V::Num(pack.lua.len() as f64));
 	report.set("foreverLevelingBiS", V::Obj(fm.clone()));
-	report.set(
-		"wowsims",
-		match &ws {
-			Some(w) => {
-				let o = Obj::new();
-				o.set("meta", V::Obj(w.meta.clone()));
-				o.set("bands", band_counts.clone());
-				o.set("rejected", V::Num(w.rejected as f64));
-				V::Obj(o)
-			}
-			None => V::Null,
-		},
-	);
 	report.set("specDataBytes", V::Num(spec_data.len() as f64));
-	report.set("gaps", V::Arr(Arr::from_vec(gaps.iter().map(|g| V::str(g)).collect())));
 	let report = V::Obj(report);
 	let report_text = stringify(&report, Some("\t"));
 
 	// The stdout of `gear build`.
 	let c = &pack.counts;
-	let mut summary = format!(
+	let summary = format!(
 		"ForeverLevelingBiS {} (data {}): {} items ({} Forever-only, {} retuned from Era, {} as in Era), {} quests; Forever.lua {} KiB\n",
 		fm.get("version").to_js_string(),
 		fm.get("generated").to_js_string(),
@@ -171,20 +135,7 @@ pub fn build(opts: &Options) -> Result<Output, String> {
 		c.unchanged,
 		c.quests,
 		to_fixed(pack.lua.len() as f64 / 1024.0, 0)
-	);
-	if let Some(w) = ws.as_ref() {
-		summary.push_str(&format!(
-			"wowsims: {} specs, {} level bands blended with a sim, {} authored only; {} sim sets rejected\n",
-			band_counts.get("specs").to_js_string(),
-			band_counts.get("simBands").to_js_string(),
-			band_counts.get("authoredOnly").to_js_string(),
-			w.rejected
-		));
-	}
-	summary.push_str(&format!("SpecData.lua {} KiB\n", to_fixed(spec_data.len() as f64 / 1024.0, 0)));
-	for g in &gaps {
-		summary.push_str(&format!("gap: {g}\n"));
-	}
+	) + &format!("SpecData.lua {} KiB\n", to_fixed(spec_data.len() as f64 / 1024.0, 0));
 
 	Ok(Output {
 		files: vec![

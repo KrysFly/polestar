@@ -1,7 +1,6 @@
-//! `gear build` (Polestar_ItemDB's Forever.lua, TOC and notice, SpecData.lua and its notice,
-//! report.json, stdout) against the JavaScript's output on a synthetic MIT ForeverLevelingBiS, an
-//! Items.lua cut, Polestar's Weights.lua and a wowsims (MIT) cache slice: rust/tests/golden/gear (README
-//! there). A ForeverLevelingBiS that is not MIT-licensed is refused.
+//! `gear build` (Polestar_ItemDB's Forever.lua, TOC and notice, SpecData.lua's racial gear traits and
+//! its notice, report.json, stdout) on a synthetic MIT ForeverLevelingBiS and an Items.lua cut:
+//! rust/tests/golden/gear (README there). A ForeverLevelingBiS that is not MIT-licensed is refused.
 
 use crate::common;
 
@@ -11,7 +10,7 @@ const BUILT_AT: &str = "2026-10-22T00:00:00.000Z";
 
 fn options(addons: std::path::PathBuf) -> Options {
 	let input = common::golden("gear").join("input");
-	Options { root: input.join("root"), addons: Some(addons), wowsims_cache: Some(input.join("root/data/sources/wowsims")), built_at: BUILT_AT.into() }
+	Options { root: input.join("root"), addons: Some(addons), built_at: BUILT_AT.into() }
 }
 
 #[test]
