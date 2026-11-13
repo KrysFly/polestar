@@ -170,8 +170,9 @@ fn an_off_hand_weapon_counts_at_the_spec_s_own_off_hand_weight_else_half_of_the_
 	let out = run(r#"
 		local dagger = { inv = 13, class = 2, subclass = 15, stats = { dps = 10 } }
 		local combat, arms = G.WeightsFor("ROGUE", "combat", 40), G.WeightsFor("WARRIOR", "arms", 30)
+		local pawn = G.Pawn.Weights(assert(G.Pawn.Parse('( Pawn: v1: "O": OffHandDps=2, MeleeDps=3 )')))
 		emit({ combat = { G.ScoreWith(dagger, combat, true), combat.ohDps, G.ScoreWith(dagger, combat), combat.dps },
-			arms = { G.ScoreWith(dagger, arms, true), arms.dps, arms.ohDps or false } })
+			arms = { G.ScoreWith(dagger, arms, true), arms.dps, arms.ohDps or false }, pawn = pawn })
 	"#);
 	let o = &out[0];
 	let f = |v: &Value| v.as_f64().unwrap();
@@ -179,4 +180,5 @@ fn an_off_hand_weapon_counts_at_the_spec_s_own_off_hand_weight_else_half_of_the_
 	assert!((f(&o["combat"][2]) - 10.0 * f(&o["combat"][3])).abs() < 1e-9, "in the main hand, the main hand's: {}", o["combat"]);
 	assert_eq!(o["arms"][2], false, "Arms has no off-hand weight");
 	assert!((f(&o["arms"][0]) - 5.0 * f(&o["arms"][1])).abs() < 1e-9, "half of the main hand's: {}", o["arms"]);
+	assert_eq!(o["pawn"], json!({ "ohDps": 2, "dps": 3 }), "Pawn's OffHandDps is the off hand's weight");
 }
