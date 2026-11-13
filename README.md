@@ -792,9 +792,12 @@ runs solo or in a raid.
 
 - **Upgrade indicator** on item tooltips: by how much an item is an upgrade
   for your spec at your level, from stat weights per spec (detected from your
-  talent points) and level band, checked against Forever's own stat
-  conversions. Forever's ratings (crit, hit, haste, expertise, armor
-  penetration, dodge, parry, block) count at the game's rating per 1%. The
+  talent points) and five-level band: stat weights from Forever Leveling BiS
+  by Thunder, used with the author's permission (2026-11-13), with Mental
+  Dexterity counted for the ranks you have ([how each weight is
+  made](docs/gear-weights.md)). Forever's ratings (crit, hit, haste,
+  expertise, armor penetration, dodge, parry, block) count at the game's
+  rating per 1%. The
   line under it says which weights it scored with and where they came from
   ("Scored for Arcane, from your talents"). Click a turn-in step's reward
   pick, or the line beside the game's reward panel heading, to choose other

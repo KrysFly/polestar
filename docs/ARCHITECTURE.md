@@ -5818,15 +5818,18 @@ Polestar.Gear.ShowWeightsSetting()                   -- Settings > Questing > Re
   `TRAIT_TREE_CURRENCY_INFO_UPDATED`, `TRAIT_NODE_CHANGED`,
   `PLAYER_ENTERING_WORLD`, and 3 s and 15 s after login, read the talents again
   (once a frame) and redo the advice only when the pick, or `pending`, changed.
-- **Talents in the weights** (`Gear.TALENT_STATS`): talents that turn one
-  stat into another, which the weights' sources (Classic formulas, sims) know
-  nothing of. On the built-in weights in use, never a custom scale, each rank
-  bought adds its share of the target stat's weight to the source stat; the
-  ranks are read by the talent's spell on the config the talent frame shows
-  (`Client.TalentSpellRanks`: each node's entry and definition, read once per
-  node). Mental Dexterity (Shaman, 3 ranks, spell 415140): a third of the
-  attack power weight to Intellect per rank, as the 12 November 2026 patch
-  notes set it (#2090). `/polestar gear spec` prints what each added.
+- **Talents in the weights** (`Gear.TALENT_STATS`, Weights.lua): talents that
+  turn one stat into another. On the built-in weights in use, never a custom
+  scale, the ranks bought add their share of the target stat's weight to the
+  source stat; the ranks are read by the talent's spell on the config the
+  talent frame shows (`Client.TalentSpellRanks`: each node's entry and
+  definition, read once per node). A talent's `source` names the spec, level
+  and share the bands already count it at, which `Gear.BandFor` takes out
+  first. Mental Dexterity (Shaman, 3 ranks, spell 415140): 33/66/100% of the
+  attack power weight to Intellect, as Forever's 12 November 2026 hotfix sets
+  it (the client's hotfix data, talent curve 85272; #2090); the bands count it
+  at 3/3 and 150% from level 15 for Enhancement. `/polestar gear spec` prints
+  what each added.
 - **Said.** Under the tooltip's upgrade line (and the reward pick line) Gear
   says what it scored with (`Gear.ScoredFor`); the guide window's reward pick
   and the reward panel's line open Stat weights on a click.
@@ -5863,17 +5866,24 @@ Polestar.Gear.Bags.Redraw()                  -- repaint the shown bags; GEAR_UPD
 - Other bag addons draw their own buttons and get no arrow; the tooltip line
   still shows on them.
 
-### Weights and Forever's ratings — Gear/Weights.lua, Gear.lua
+### Weights and Forever's ratings — Gear/Weights.lua, WeightBands.lua, Gear.lua
 
-- **Weights by level band.** `Gear.WeightsFor` gives the spec's band for
-  the level (`Gear.WEIGHT_BANDS`, generated SpecData.lua: Classic and
-  Season of Discovery simulations blended with Polestar's own), else its
-  table in Weights.lua. No simulation has Forever's own ratings, so a band
-  takes `haste`, `expertise` and `armorPen` from Weights.lua (#1529).
-  Weights.lua's header records what was checked against Forever's client tables
-  (`ChrClasses`, `PlayerExpectedStat`, `gametables/combatratings.txt`, read
-  with `forge gamedata export` and `forge gamedata file`) and how the weights
-  of Forever's own ratings were set.
+- **Weights by level band.** Stat weights from Forever Leveling BiS by
+  Thunder, used with the author's permission (2026-11-13): `Gear.WEIGHT_BANDS`
+  (WeightBands.lua) holds its v1.2.7 numbers per spec, in twelve level bands
+  (1-9, 10-14, … 55-59, 60), in its own stat names and units.
+  `Gear.BandFor(class, spec, level)` (Weights.lua) reads a band into
+  Polestar's keys with the spec's main stat at 1 (`Gear.MAIN_STAT`), turns its
+  per-rating haste and expertise into per 1%, takes Mental Dexterity's old
+  share out of Enhancement's Intellect (`Gear.TALENT_STATS` `source`), and
+  fills in Polestar's own weights from the game's formulas (health, mana,
+  health per 5 seconds, armor penetration; `info.ours` lists them); results
+  are cached per band. `Gear.WeightsFor` adds the casters' 0.01 melee weapon
+  DPS tiebreak. docs/gear-weights.md has every rule and formula and every
+  spec's weights at levels 10 to 60; the addon tests `gear_weights::*` check
+  every band against those rules. `Gear.HasWeights(class[, spec])` says
+  whether a class or spec has weights. An off-hand weapon counts at the
+  spec's `ohDps` weight where it has one, else half of `dps`.
 - **Ratings at the client's rate.** `C_Item.GetItemStats` reports an item's
   rating points. `Gear.RATINGS` divides each by the points per 1% of the
   client's `combatratings` table (crit 14, hit 10, haste 10, expertise 10,

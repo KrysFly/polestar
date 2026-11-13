@@ -126,8 +126,9 @@ never in saved variables.
 | File | Public table | What it does |
 |---|---|---|
 | `ItemDB.lua` | `ItemDB` | Reads `Polestar_ItemDB`; entries are parsed on first lookup |
-| `Weights.lua` | `Gear` | Leveling stat weights per class and spec, and what each class can wear |
-| `SpecData.lua` | `Gear` | Generated: stat weight bands per spec and level, racial gear traits |
+| `Weights.lua` | `Gear` | Reads the stat weight bands into Polestar's keys per class, spec and level (`Gear.BandFor`), fills in Polestar's own weights from the game's formulas, the stat-turning talents; what each class can wear |
+| `WeightBands.lua` | `Gear` | Stat weights from Forever Leveling BiS by Thunder, used with the author's permission (2026-11-13): its numbers per spec and level band (docs/gear-weights.md) |
+| `SpecData.lua` | `Gear` | Generated: racial gear traits |
 | `PawnStats.lua`, `Pawn.lua` | `Gear.Pawn`, `Gear.Scales` | Custom stat weights from Pawn scale strings |
 | `Adjust.lua` | `Gear.Adjust` | The player's own changes to the built-in weights, with Revert to default (#1529) |
 | `Gear.lua` | `Gear` | Upgrade advice: an item's score and whether it is an upgrade |
