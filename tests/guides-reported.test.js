@@ -2953,6 +2953,14 @@ test('Horde 40-50/02: a character who knows Gadgetzan flies there instead of Fre
 	assert.equal(steps.filter((st) => flies(st, 'Gadgetzan') && taxi(st, false)).length, freewind.length, 'each has a Gadgetzan twin');
 });
 
+test('Horde 40-50: the steps beside the elites and level 60 roamers the danger gate reviewed warn about them (#1575)', { skip }, () => {
+	for (const [n, quest, name] of [['02-feralas', 2975, "Ohk'zi"], ['02-feralas', 2974, 'Namida Grimtotem'], ['03-feralas', 699, 'Methuselah Crab'], ['03-feralas', 3128, 'Vale Screamer']]) {
+		const list = goals(H40(n));
+		const { step } = list[at(list, `${n}: the objective of ${quest}`, (g) => g.quest === quest && ['kill', 'collect'].includes(g.t))];
+		assert.ok([step.tip].flat().filter(Boolean).join(' ').includes(name), `${n}: the ${quest} step names ${name}`);
+	}
+});
+
 // The goals the stray rule moved, checked against their steps (#175 review): the
 // Grizzled Scalps are taken where the bears are, and cloth the guide says to buy
 // leads to the Auction House, not to the guards and mobs that happen to drop it.
