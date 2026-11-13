@@ -35,10 +35,10 @@ next forever/horde/05-stonetalon-mountains
 # Flow: Orgrimmar -> Far Watch Post (Orcs and Trolls: Kargal, Uzzek) -> the Crossroads (flight
 # path, bind) -> the Razormane camp -> the Crossroads -> Ratchet (Southsea beach) -> the oases and
 # Regthar -> the Dry Hills -> the Sludge Fen console -> the Razormane camp -> the Crossroads ->
-# the Dry Hills -> Echeyakee -> the Crossroads -> Ratchet
+# the Dry Hills (the harpy rings, Vrang's lions and Walton's ridge) -> Echeyakee -> the Crossroads -> Ratchet
 # (Samophlange handed in): the Raptor Grounds' nests and the silver -> Gazlowe's Stolen Booty on
 # the beach -> Northwatch Hold and Gilthares' escort back to Ratchet -> fly to the Crossroads ->
-# the Dry Hills (Vrang, Walton) -> Wenikee -> the Sludge Fen shredder
+# the Dry Hills (Serena) -> Wenikee -> the Sludge Fen shredder
 # and Nugget Slugs -> the Boulder Lode Mine -> Wenikee -> the Crossroads -> Verog and Tonga's seed test at the Stagnant Oasis -> Camp Taurajo (flight path) -> the Bristleback camps ->
 # Agama'gor -> fly to Orgrimmar for level 20 training -> fly to Ratchet -> Ishamuhale -> the
 # Crossroads, Regthar,
@@ -476,9 +476,37 @@ step The Dry Hills
   collect 4926 @37.9,16.2
   accept 819
 
-step Raptor Horns
-  tip On the way east to Echeyakee: Sunscale Scytheclaws prowl the plains east of the Dry Hills; any of them can drop an Intact Raptor Horn for Mebok in Ratchet.
+step Vrang Wildgore
+  zone The Barrens
+  tip East from the keg along the hills: Vrang Wildgore camps below them. Walton, the hermit on the ridge behind him, has work for you only once Vrang sends you up.
+  accept 95494                        -- Vrang Wildgore
+  accept 95507
+
+step Vrang's plains
+  zone The Barrens
+  tip Savannah Patriarchs roam the plains just south-east of Vrang's camp, and the Sprung Traps lie among them. Sunscale Scytheclaws prowl there too: any of them can drop an Intact Raptor Horn for Mebok in Ratchet.
+  collect 269719 quest 95507.1
+  collect 269715 quest 95494.1 @45.0,14.5
   collect 5055 quest 865.1 @44.1,14.4
+
+step Vrang Wildgore
+  turnin 95494                        -- Vrang Wildgore
+  turnin 95507
+  accept 95495
+
+step Walton
+  turnin 95495                        -- Walton
+  accept 95621
+
+step Trouble in the Valley
+  tip Corporal Adamore and his marines hold the wrecked caravan south of Walton. The marines are linked: pulling one calls the rest. Pull from the edge and run; they leash short, so you can thin the camp one at a time before tackling the Corporal.
+  collect 270151 quest 95621.1 @41.8,15.6
+
+step Walton
+  turnin 95621                        -- Walton
+  accept 95508
+  complete 95508                      -- Assist Walton: stay by him when Terry Longdrink and the Kul Tiras marines come up the ridge
+  turnin 95508
 
 step Echeyakee
   zone The Barrens
@@ -655,43 +683,16 @@ step Kolkar camp
   collect 15852 x5 quest 6128.2       -- Kodo Horn
   collect 2449 x5 quest 6128.1        -- Earthroot
 
-step Vrang Wildgore
+step Serena Bloodfeather
   zone The Barrens
-  tip North to the Dry Hills. Vrang Wildgore camps below the hills; Walton, the hermit on the ridge behind him, has work for you only once Vrang sends you up.
-  accept 95494                        -- Vrang Wildgore
-  accept 95507
-
-step The Barrens: kill these as you meet them
-  zone The Barrens
-  tip Savannah Patriarchs roam the plains east of the hills, and the Sprung Traps lie among them. Serena Bloodfeather leads the Witchwing harpies in the hills to the west.
+  tip North-west to the Dry Hills: Serena Bloodfeather leads the Witchwing harpies in the hills west of Walton's ridge.
   tip Careful: The route in passes stealthed Harpy Ambushers and an elite harpy that patrols.
-  collect 269719 quest 95507.1
-  collect 269715 quest 95494.1 @45.0,14.5
-  collect 5055 quest 865.1 @44.7,14.3 -- Raptor Horns, if still open: Sunscale Scytheclaws prowl among the lions
+  collect 5055 quest 865.1 @44.7,14.3 -- Raptor Horns, if still open: Sunscale Scytheclaws prowl the plains east of the hills
   collect 5067 quest 876.1
-
-step Vrang Wildgore
-  turnin 95494                        -- Vrang Wildgore
-  turnin 95507
-  accept 95495
-
-step Walton
-  turnin 95495                        -- Walton
-  accept 95621
-
-step Trouble in the Valley
-  tip Corporal Adamore and his marines hold the wrecked caravan south of Walton. The marines are linked: pulling one calls the rest. Pull from the edge and run; they leash short, so you can thin the camp one at a time before tackling the Corporal.
-  collect 270151 quest 95621.1 @41.8,15.6
-
-step Walton
-  turnin 95621                        -- Walton
-  accept 95508
-  complete 95508                      -- Assist Walton: stay by him when Terry Longdrink and the Kul Tiras marines come up the ridge
-  turnin 95508
 
 step Wenikee Boltbucket
   zone The Barrens
-  tip East from Walton toward the Sludge Fen: Wenikee stands at the camp on the road north of the Crossroads.
+  tip East from the Dry Hills toward the Sludge Fen: Wenikee stands at the camp on the road north of the Crossroads.
   turnin 3921
   accept 3922
 

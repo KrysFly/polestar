@@ -5396,6 +5396,21 @@ test("Silverpine Forest and the Barrens (Horde): Ak'Zeloth from Neeru to Far Wat
 	assert.equal(barrens[give].goal.npc, 3521, "Ak'Zeloth");
 });
 
+// #1959 (0.4.0 route audit): Vrang Wildgore's quests and Walton's chain (level 18, from 14, no outside prerequisite)
+// waited for a third Dry Hills visit, a 1,475 yd walk in to Vrang's accept; the second visit already walks the hills for
+// Harpy Lieutenants and Vrang's plains for the Raptor Horns. They are done there now, before the Crossroads stop that
+// takes the rings and Echeyakee; the third visit stays for Serena Bloodfeather, who needs the rings handed in first.
+test('The Barrens (Horde): Vrang and Walton on the second Dry Hills visit, Serena on the third (#1959)', { skip }, () => {
+	const list = goals(BARRENS);
+	const rings = at(list, 'accept 875', is('accept', 875));
+	const back = at(list, 'turnin 875', is('turnin', 875));
+	for (const q of [95494, 95507, 95495, 95621, 95508]) {
+		const i = at(list, `turnin ${q}`, is('turnin', q));
+		assert.ok(i > rings && i < back, `${q} handed in between taking the rings and handing them in`);
+	}
+	assert.ok(at(list, 'collect 876', (g) => g.t === 'collect' && g.quest === 876) > back, 'Serena after the rings are handed in');
+});
+
 // 0.4.0 route audit, Horde 12-21 (players' recordings, 0.3.7: both Druids who reached it flew Crossroads -> Orgrimmar
 // for Rilli Greasygob, then on to Thunder Bluff): Druids and Paladins have no trainer in Orgrimmar. They take Thunder
 // Bluff in the Orgrimmar trip's place (Paladins learn its flight path by Camp Taurajo), Druids with Cat Form and Cure

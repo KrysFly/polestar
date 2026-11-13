@@ -11248,6 +11248,19 @@
 			},
 			{
 				"a": [
+					"turnin",
+					95508
+				],
+				"b": [
+					"turnin",
+					881
+				],
+				"faction": "Horde",
+				"why": "#1959 (Horde 12-21 audit, 0.4.0): Vrang Wildgore's two quests and Walton's three (all level 18, from 14, no outside prerequisite) are done on the second Dry Hills visit with Harpy Lieutenants, where the route already walks the hills and Vrang's plains for the Raptor Horns, before the Crossroads stop that takes Echeyakee (881). The third visit was a 1,475 yd walk in to Vrang's accept (flow audit); it stays for Serena Bloodfeather, who needs Harpy Lieutenants handed in first. Players stand at 19.2-20.0 on the second visit (recordings, 8-10 people); Vrang offered his quests to 46 people at 15-22.",
+				"source": "#1959"
+			},
+			{
+				"a": [
 					"accept",
 					365
 				],
