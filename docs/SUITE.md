@@ -43,7 +43,8 @@ and the rules follow it:
 
 | Input | What may enter the repository and the releases |
 |---|---|
-| MIT (pfQuest, ForeverLevelingBiS, wowsims) | Derived data, with attribution (THIRD_PARTY.md) |
+| MIT (pfQuest, ForeverLevelingBiS up to its MIT versions) | Derived data, with attribution (THIRD_PARTY.md) |
+| Used with the author's permission (Forever Leveling BiS v1.2.7's stat weights) | The stat weights in `addon/Polestar/Gear/WeightBands.lua`, credited there, in THIRD_PARTY.md and on the About page (docs/gear-weights.md) |
 | QuestieDB (no licence file; its maintainers ask that it be treated as all rights reserved) | Facts only, credited, in the shipped packs (the compiled guides, `Polestar_QuestDB`, `Polestar_Codex`); `data build --no-questie` builds without them if the maintainers ask |
 | Web sources (Forever's quest data, warcraft.wiki.gg, the Forever databases) | Facts only, each with its source: corrections, `entrances.json`, `repgates.json`, `attunements.json`, `journal-quests.json`, the web caches in `data/sources/web/` (incl. its dungeon and raid quest lists) |
 | GPL-2.0, no licence or All Rights Reserved addons (AtlasLoot, DungeonJournal, RareScanner, Attune) | Nothing: the importer code only, read by `forge data codex --local-extras` for the parity comparison (Attune: by `codex attune`, the local comparison of dungeon quests and attunements); its output stays local and `pack` refuses it |
@@ -55,7 +56,7 @@ their versions in its `meta`.
 ## Data layer
 
 - Importers: `tools/lib/consume/<addon>.js` for the Codex and gear sources
-  (AtlasLoot, ForeverLevelingBiS, RareScanner, wowsims), sharing one
+  (AtlasLoot, ForeverLevelingBiS, RareScanner), sharing one
   Lua-literal reader (`lua.js`); QuestieDB is read by `forge data build`,
   DungeonJournal by `forge data dungeons`. Each returns plain JSON. Web sources are
   cached under `data/sources/` and only fetched when asked.
