@@ -35,14 +35,14 @@
 --       weights the advice scored with, said under it (#2035)
 --   Gear.ShowWeightsSetting(): Settings > Questing > Rewards & gear, Gear advice
 --   Gear.GetWeights() -> weights (read-only): the spec's band for this level
---       (Gear.WEIGHT_BANDS, generated SpecData.lua), else the authored table
---       (Weights.lua); Forever's own ratings, which no band weighs (haste,
---       expertise, armorPen), come from the authored table;
---       a small melee weapon DPS weight is added where the spec has none
---       (Feral's is 14x its attack power weight), the share of a stat that a
---       talent turns into another (Gear.TALENT_STATS: Mental Dexterity), and
---       the player's own changes on top (Gear.Adjust, Adjust.lua)
---   Gear.GetWeightsInfo() -> { source, note, upTo, level } of the weights in use
+--       (Gear.WeightsFor: stat weights from Forever Leveling BiS by Thunder,
+--       used with the author's permission, in Polestar's keys with the stats
+--       it leaves out from the game's formulas; Weights.lua, WeightBands.lua,
+--       docs/gear-weights.md); a small melee weapon DPS weight is added where
+--       the spec has none, the share of a stat that a talent turns into another
+--       (Gear.TALENT_STATS: Mental Dexterity), and the player's own changes on
+--       top (Gear.Adjust, Adjust.lua)
+--   Gear.GetWeightsInfo() -> { source, from, upTo, ours, adjusted } of the weights in use
 --   Gear.GetPlayer() -> { class, classID, level, race, raceID, faction } (read-only)
 --   Gear.GetRacial() -> the racial gear traits in use (Gear.RACIALS by raceID) | nil
 --   Gear.IsEnabled() -> bool
@@ -69,8 +69,7 @@ local L = ns.L
 local type, tonumber, tostring, pairs, ipairs, pcall, next = type, tonumber, tostring, pairs, ipairs, pcall, next
 local floor = math.floor
 
-local CLASSES, WEIGHTS, PROFICIENCY = Gear.CLASSES, Gear.WEIGHTS, Gear.PROFICIENCY
-local BANDS = Gear.WEIGHT_BANDS or {}
+local CLASSES, PROFICIENCY = Gear.CLASSES, Gear.PROFICIENCY
 local RACIALS = Gear.RACIALS or {}
 
 ---------------------------------------------------------------------------
@@ -453,7 +452,7 @@ local MELEE_INV = { [13] = true, [17] = true, [21] = true, [22] = true }
 local OFFHAND_INV = { [14] = true, [22] = true, [23] = true }
 -- Armor-class items every class wears whatever their subclass says.
 local ANY_ARMOR_INV = { [2] = true, [11] = true, [12] = true, [16] = true, [23] = true }
-local OFFHAND_DPS = 0.5 -- off-hand weapons hit for half damage
+local OFFHAND_DPS = 0.5 -- off-hand weapons hit for half damage (weights without ohDps)
 local DUAL_WIELD_SPELL = 674
 
 -- C_Item.GetItemStats keys -> canonical stat keys. Unknown keys are ignored.
@@ -736,91 +735,41 @@ function Gear.DetectSpec(class, classID, all)
 	return meta.default, "default", r
 end
 
--- Melee weapon DPS for the specs whose weights leave it out: every caster, and
--- Druids. Low-level casters and Druids still fight with the weapon, so a staff
--- or dagger that hits harder counts. A tiebreaker: the stats that matter
--- outweigh it; a weight the spec has is never changed. Feral weighs weapon DPS
--- as the other melee specs do, 14 attack power per DPS (AP_PER_DPS): in
--- Forever, Cat, Bear and Dire Bear Form hit with the equipped weapon's DPS
--- (Blizzard's Forever Druid class deep dive; #731).
+-- Melee weapon DPS for the specs whose weights leave it out (casters): a
+-- low-level caster still fights with the weapon, so a staff or dagger that
+-- hits harder counts. A tiebreaker: the stats that matter outweigh it; a
+-- weight the spec has is never changed (Feral has its own: Forever's forms hit
+-- with the equipped weapon's DPS).
 local MELEE_DPS = 0.01
-local AP_PER_DPS = 14
 local withMelee = setmetatable({}, { __mode = "k" }) -- weights -> weights with dps
 
-local function withMeleeDps(w, class, key)
+local function withMeleeDps(w)
 	if not w or w.dps ~= nil then return w end
 	local c = withMelee[w]
 	if not c then
 		c = {}
 		for k, v in pairs(w) do c[k] = v end
-		c.dps = (class == "DRUID" and key == "feral" and w.ap) and AP_PER_DPS * w.ap or MELEE_DPS
+		c.dps = MELEE_DPS
 		withMelee[w] = c
 	end
 	return c
 end
 
--- Forever's own ratings (#1529): the Classic and Season of Discovery sims the
--- bands come from have none, so a band takes the authored table's weight.
-local FOREVER_ONLY = { "haste", "expertise", "armorPen" }
-local withForever = setmetatable({}, { __mode = "k" }) -- band weights -> with Forever's ratings
-
-local function withForeverRatings(w, authored)
-	if not (w and authored) then return w end
-	local c = withForever[w]
-	if c then return c end
-	c = w
-	for _, k in ipairs(FOREVER_ONLY) do
-		if w[k] == nil and authored[k] then
-			if c == w then
-				c = {}
-				for kk, v in pairs(w) do c[kk] = v end
-			end
-			c[k] = authored[k]
-		end
-	end
-	withForever[w] = c
-	return c
-end
-
--- The spec's weights at a level: the first band whose upTo covers it (the
--- last band past the end), with Forever's own ratings from the authored
--- table, else the authored table; with a melee DPS weight where the spec has
--- none (above).
--- -> weights, info { source, note, upTo }
+-- The spec's weights at a level: its band in Polestar's keys (Gear.BandFor,
+-- Weights.lua), with a melee DPS weight where the spec has none (above).
+-- -> weights, info { source = "flbis", from, upTo, ours } | nil
 function Gear.WeightsFor(class, key, level)
-	local authored = WEIGHTS[class] and WEIGHTS[class][key]
-	local bands = BANDS[class] and BANDS[class][key]
-	if bands and #bands > 0 then
-		local pick = bands[#bands]
-		for i = 1, #bands do
-			if level <= bands[i].upTo then
-				pick = bands[i]
-				break
-			end
-		end
-		return withMeleeDps(withForeverRatings(pick.weights, authored), class, key), pick
-	end
-	local w = authored
-	return withMeleeDps(w, class, key), w and { source = "polestar", upTo = 60 } or nil
+	local w, info = Gear.BandFor(class, key, level)
+	return withMeleeDps(w), info
 end
 
--- Talents that turn one stat into another, which the weights' sources could
--- not see (Classic formulas and sims know no Forever talent): by class, the
--- talent's spell and ranks, and per rank the share of `from` that counts as
--- `into`. The built-in weights in use get `from` raised by `into`'s weight
--- times that share times the ranks bought (a custom scale is used as it is).
---   Mental Dexterity (Enhancement, 3 ranks): 33/66/100% of Intellect as attack
---   power, as the 12 November 2026 patch notes give it (#2090; was 50/100/150%).
-local TALENT_STATS = {
-	SHAMAN = { { spell = 415140, ranks = 3, from = "int", into = "ap", per = 1 / 3 } },
-}
-Gear.TALENT_STATS = TALENT_STATS
-
--- The weights with the class's stat-turning talents counted, and what each
--- added ({ { spell, ranks, max, from, into, add } }, for /polestar gear spec).
--- The talents are read on the config the talent frame shows. -> weights, added
+-- The weights with the class's stat-turning talents counted (Gear.TALENT_STATS,
+-- Weights.lua: the share of `into`'s weight for the ranks bought goes to
+-- `from`), and what each added ({ { spell, ranks, max, from, into, add } },
+-- for /polestar gear spec). The talents are read on the config the talent
+-- frame shows. -> weights, added
 local function withTalentStats(w, class)
-	local list = TALENT_STATS[class]
+	local list = Gear.TALENT_STATS[class]
 	if not (w and list) then return w, nil end
 	local configs = Client.TalentConfigs()
 	local config = type(configs) == "table" and configs[1] or nil
@@ -831,7 +780,7 @@ local function withTalentStats(w, class)
 	local out, added = nil, nil
 	for _, t in ipairs(list) do
 		local r = math.min(ranks[t.spell] or 0, t.ranks)
-		local add = r * t.per * (w[t.into] or 0)
+		local add = (t.shares[r] or 0) * (w[t.into] or 0)
 		if add > 0 then
 			if not out then
 				out = {}
@@ -850,7 +799,7 @@ local function resolveSpec()
 	local class = player.class
 	specReport, customLabel, customName, weightTalents, adjusted = nil, nil, nil, nil, 0
 	scoredText[true], scoredText[false] = nil, nil
-	if not (class and WEIGHTS[class]) then
+	if not Gear.HasWeights(class) then
 		specKey, specSource, weights, weightsInfo = nil, "default", nil, nil
 		return
 	end
@@ -862,7 +811,7 @@ local function resolveSpec()
 		customLabel, customName = (L["Custom: %s"]):format(scale.name), scale.name
 		return
 	end
-	if chosen and chosen ~= "auto" and WEIGHTS[class][chosen] then
+	if chosen and chosen ~= "auto" and Gear.HasWeights(class, chosen) then
 		specKey, specSource = chosen, "setting"
 	else
 		specKey, specSource, specReport = Gear.DetectSpec(class, player.classID)
@@ -1000,7 +949,7 @@ local function scoreWith(info, w, asOffhand)
 			if RANGED_INV[info.inv] then
 				s = s + (w.rdps or 0) * v
 			elseif MELEE_INV[info.inv] then
-				s = s + (w.dps or 0) * v * (asOffhand and OFFHAND_DPS or 1)
+				s = s + (asOffhand and (w.ohDps or (w.dps or 0) * OFFHAND_DPS) or (w.dps or 0)) * v
 			end
 		elseif SCHOOLS[k] then
 			school = school + (w[k] or 0) * v
@@ -1370,7 +1319,7 @@ end
 function Gear.PrintSpecReport()
 	local p = Gear.GetPlayer()
 	local meta = p.class and CLASSES[p.class]
-	if not (meta and WEIGHTS[p.class]) then
+	if not (meta and Gear.HasWeights(p.class)) then
 		ns.Print(L["Gear advice: no weights for this class"])
 		return
 	end

@@ -319,7 +319,7 @@ function UI.ShowAdjust(key)
 	local class = playerClass()
 	if not (class and gear().CLASSES[class]) then return end
 	if not F then build() end
-	spec = (key and gear().WEIGHTS[class][key]) and key or specInUse(class)
+	spec = (key and gear().HasWeights(class, key)) and key or specInUse(class)
 	setStatus("")
 	relist()
 	F:Show()

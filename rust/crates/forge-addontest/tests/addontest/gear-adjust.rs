@@ -32,13 +32,18 @@ fn a_change_applies_at_once_marks_the_spec_adjusted_and_follows_a_new_default() 
 		emit({ label = label, source = source, adjusted = G.GetWeightsInfo().adjusted, sta = G.GetWeights().sta, want = base.sta * 1.5,
 			str = G.GetWeights().str == base.str, scored = G.ScoreItem("item:9001") > before, stored = Polestar.DB().gearAdjust.WARRIOR.arms.sta })
 		-- The band in use changes the default (an update, or the next band at a level up): the change is half
-		-- again of the new one.
-		for _, b in ipairs(G.WEIGHT_BANDS.WARRIOR.arms) do
-			if 30 <= b.upTo then
+		-- again of the new one. Stamina 1.6 in the band's units is 0.8 of Strength's 2.
+		local spec, col, n = G.WEIGHT_BANDS.WARRIOR.arms, nil, 0
+		for name in spec[1]:gmatch("%S+") do
+			n = n + 1
+			if name == "sta" then col = n + 1 end
+		end
+		for i = 2, #spec do
+			if 30 <= spec[i][1] then
 				local t = {}
-				for k, v in pairs(b.weights) do t[k] = v end
-				t.sta = 0.8
-				b.weights = t
+				for k, v in ipairs(spec[i]) do t[k] = v end
+				t[col] = 1.6
+				spec[i] = t
 				break
 			end
 		end

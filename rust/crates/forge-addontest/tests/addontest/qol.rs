@@ -3975,7 +3975,19 @@ fn rewards_with_the_real_gear_module_a_two_hander_stays_on_against_a_one_hander_
 		stubs: vec!["stub_qol.lua"],
 		addons: vec![Addon::files(
 			"Polestar",
-			&["Core/Init.lua", "Core/Compat.lua", "Theme/Theme.xml", "Gear/ItemDB.lua", "Gear/Weights.lua", "Gear/SpecData.lua", "Gear/PawnStats.lua", "Gear/Pawn.lua", "Gear/Gear.lua", "QoL/QoL.xml"],
+			&[
+				"Core/Init.lua",
+				"Core/Compat.lua",
+				"Theme/Theme.xml",
+				"Gear/ItemDB.lua",
+				"Gear/Weights.lua",
+				"Gear/WeightBands.lua",
+				"Gear/SpecData.lua",
+				"Gear/PawnStats.lua",
+				"Gear/Pawn.lua",
+				"Gear/Gear.lua",
+				"QoL/QoL.xml",
+			],
 		)],
 		before: r#"
 			local q = stub.qol
@@ -3993,10 +4005,10 @@ fn rewards_with_the_real_gear_module_a_two_hander_stays_on_against_a_one_hander_
 			PRELUDE,
 			r#"
 			Polestar.ItemDB.Register({ schema = 1, build = "test" }, {
-				[9032] = "17 22 17 2 2 8 str10 dmin40 dmax60 speed3000",          -- two-hander: 126.9
-				[9033] = "13 22 17 2 2 7 agi3 dmin12 dmax22 speed1800",           -- weak one-hander: 67.6
-				[9034] = "14 30 25 3 4 6 sta20 armor3000",                        -- strong shield: 70
-				[9035] = "13 30 25 3 2 7 str20 dmin30 dmax50 speed2000",          -- strong one-hander: 160
+				[9032] = "17 22 17 2 2 8 str10 dmin40 dmax60 speed3000",          -- two-hander: 116.3
+				[9033] = "13 22 17 2 2 7 agi3 dmin12 dmax22 speed1800",           -- weak one-hander: 62.0
+				[9034] = "14 30 25 3 4 6 sta20 armor3000",                        -- strong shield: 101.9
+				[9035] = "13 30 25 3 2 7 str20 dmin30 dmax50 speed2000",          -- strong one-hander: 147.3
 				[9010] = "11 20 15 2 4 0 sta5", [9011] = "11 20 15 2 4 0 sta2",
 				[9012] = "11 20 15 2 4 0 sta4", [9013] = "11 25 20 3 4 0 sta6",
 			})
@@ -4024,11 +4036,11 @@ fn rewards_with_the_real_gear_module_a_two_hander_stays_on_against_a_one_hander_
 
 			q.calls = {}
 			turnIn({ { id = 9035 } }, {})
-			emit({ worn = worn(), main = q.worn[16], said = printed("Wearing |Hitem:9035|h%[Item 9035%]|h %(%+26%%%)") })
+			emit({ worn = worn(), main = q.worn[16], said = printed("Wearing |Hitem:9035|h%[Item 9035%]|h %(%+27%%%)") })
 
 			q.calls = {}
-			q.worn[11], q.worn[12] = 9013, 9011   -- 3 and 1
-			turnIn({ { id = 9012 } }, { { id = 9010 } })   -- 2 takes the 1's finger, then 2.5 takes the 2's
+			q.worn[11], q.worn[12] = 9013, 9011   -- 3.57 and 1.19 (6 and 2 Stamina at Arms' 0.595)
+			turnIn({ { id = 9012 } }, { { id = 9010 } })   -- 2.38 takes the 1.19's finger, then 2.975 takes the 2.38's
 			emit({ worn = worn(), fingers = { q.worn[11], q.worn[12] } })
 		"#,
 		]

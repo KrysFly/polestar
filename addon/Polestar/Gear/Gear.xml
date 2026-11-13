@@ -1,6 +1,7 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
 	<Script file="ItemDB.lua"/>
 	<Script file="Weights.lua"/>
+	<Script file="WeightBands.lua"/>
 	<Script file="SpecData.lua"/>
 	<Script file="PawnStats.lua"/>
 	<Script file="Pawn.lua"/>

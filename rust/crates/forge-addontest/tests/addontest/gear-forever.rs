@@ -1,6 +1,5 @@
-//! Forever's ratings and Polestar's own weights (addon/Polestar/Gear/Gear.lua, Weights.lua, PawnStats.lua, #1529): an
-//! item's ratings read at the client's points per 1%, haste, expertise and armor penetration weighed, and a level
-//! band's weights with Forever's own ratings taken from Weights.lua (no simulation has them).
+//! Forever's ratings (addon/Polestar/Gear/Gear.lua, Weights.lua, PawnStats.lua, #1529): an item's ratings read at the
+//! client's points per 1%, and haste, expertise and armor penetration weighed in the bands (docs/gear-weights.md).
 
 use forge_addontest::{emitted, Addon, RunAddon};
 use serde_json::{json, Value};
@@ -38,12 +37,13 @@ fn an_item_s_ratings_count_at_the_client_s_points_per_1_percent_and_plain_hit_an
 }
 
 #[test]
-fn every_spec_weighs_haste_melee_specs_expertise_and_armor_penetration_casters_neither() {
+fn every_band_weighs_haste_weapon_specs_expertise_and_physical_damage_armor_penetration() {
 	let out = run(r#"
 		local out = {}
-		for class, specs in pairs(G.WEIGHTS) do
-			for key, w in pairs(specs) do
-				out[class .. "." .. key] = { haste = w.haste or 0, expertise = w.expertise or 0, armorPen = w.armorPen or 0, crit = w.crit or 0 }
+		for class, meta in pairs(G.CLASSES) do
+			for _, s in ipairs(meta.specs) do
+				local w = G.WeightsFor(class, s.key, 60)
+				out[class .. "." .. s.key] = { haste = w.haste or 0, expertise = w.expertise or 0, armorPen = w.armorPen or 0, crit = w.crit or 0 }
 			end
 		end
 		local stat = {}
@@ -53,61 +53,18 @@ fn every_spec_weighs_haste_melee_specs_expertise_and_armor_penetration_casters_n
 	let specs = out[0]["specs"].as_object().unwrap();
 	assert_eq!(specs.len(), 27);
 	assert_eq!(out[0]["keys"], json!([true, true, true]));
-	let melee = [
-		"WARRIOR.arms",
-		"WARRIOR.fury",
-		"WARRIOR.protection",
-		"PALADIN.protection",
-		"PALADIN.retribution",
-		"ROGUE.assassination",
-		"ROGUE.combat",
-		"ROGUE.subtlety",
-		"SHAMAN.enhancement",
-		"DRUID.feral",
-	];
+	let weapon = ["WARRIOR.arms", "WARRIOR.fury", "WARRIOR.protection", "PALADIN.retribution", "ROGUE.assassination", "ROGUE.combat", "ROGUE.subtlety", "SHAMAN.enhancement", "DRUID.feral"];
 	for (name, w) in specs {
-		assert!(w["haste"].as_f64().unwrap() > 0.0, "{name} weighs haste");
-		let is_melee = melee.contains(&name.as_str());
 		let hunter = name.starts_with("HUNTER.");
-		assert_eq!(w["expertise"].as_f64().unwrap() > 0.0, is_melee || hunter, "{name}: expertise");
-		assert_eq!(w["armorPen"].as_f64().unwrap() > 0.0, is_melee || hunter, "{name}: armor penetration");
-		if is_melee && name != "WARRIOR.protection" && name != "PALADIN.protection" {
-			assert!(w["haste"].as_f64().unwrap() < w["crit"].as_f64().unwrap(), "{name}: specials are not hasted, so haste is worth less than crit");
+		let melee = weapon.contains(&name.as_str());
+		// Forever Leveling BiS gives a Protection Paladin no haste and no expertise.
+		assert_eq!(w["haste"].as_f64().unwrap() > 0.0, name != "PALADIN.protection", "{name}: haste");
+		assert_eq!(w["expertise"].as_f64().unwrap() > 0.0, melee || hunter, "{name}: expertise");
+		assert_eq!(w["armorPen"].as_f64().unwrap() > 0.0, melee || hunter || name == "PALADIN.protection", "{name}: armor penetration");
+		if melee && name != "WARRIOR.protection" {
+			assert!(w["haste"].as_f64().unwrap() < w["crit"].as_f64().unwrap(), "{name}: haste is worth less than crit");
 		}
 	}
-}
-
-#[test]
-fn a_level_band_keeps_its_own_numbers_and_takes_forever_s_ratings_from_weights_lua() {
-	let out = run(r#"
-		local diff, banded = {}, 0
-		for class, specs in pairs(G.WEIGHTS) do
-			for key, w in pairs(specs) do
-				local bands = G.WEIGHT_BANDS[class] and G.WEIGHT_BANDS[class][key]
-				if bands then banded = banded + 1 end
-				for _, level in ipairs({ 1, 24, 25, 40, 59, 60 }) do
-					local got, info = G.WeightsFor(class, key, level)
-					local function bad(k) diff[#diff + 1] = class .. "." .. key .. "@" .. level .. ":" .. k end
-					if bands then
-						local pick = bands[#bands]
-						for _, b in ipairs(bands) do if level <= b.upTo then pick = b break end end
-						if info ~= pick then bad("band") end
-						for k, v in pairs(pick.weights) do if got[k] ~= v then bad(k) end end
-						for _, k in ipairs({ "haste", "expertise", "armorPen" }) do
-							if got[k] ~= (pick.weights[k] or w[k]) then bad(k) end
-						end
-					else
-						for k, v in pairs(w) do if got[k] ~= v then bad(k) end end
-					end
-				end
-			end
-		end
-		local arms = G.WeightsFor("WARRIOR", "arms", 60)
-		emit({ n = #diff, first = diff[1] or false, banded = banded, arms = { haste = arms.haste, expertise = arms.expertise, armorPen = arms.armorPen } })
-	"#);
-	assert_eq!(out[0]["n"], 0, "first difference: {}", out[0]["first"]);
-	assert_eq!(out[0]["banded"], 27, "every spec has bands");
-	assert_eq!(out[0]["arms"], json!({ "haste": 6, "expertise": 8.1, "armorPen": 3 }), "Arms at 60: its band, with Weights.lua's haste, expertise and armor penetration");
 }
 
 #[test]

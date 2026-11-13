@@ -112,8 +112,18 @@ fn client_stats_win_over_itemdb_for_base_stats_itemdb_fills_equip_bonuses_the_cl
 }
 
 #[test]
-fn the_class_weight_table_nine_classes_three_specs_each_known_stat_keys_sane_priorities() {
-	let out = run(r#"emit({ classes = G.CLASSES, weights = G.WEIGHTS, keys = G.STAT_KEYS, prof = G.PROFICIENCY })"#, Opts::default());
+fn the_class_weight_table_nine_classes_three_specs_each_known_stat_keys_sane_priorities_at_60() {
+	let out = run(
+		r#"
+		local weights = {}
+		for class, meta in pairs(G.CLASSES) do
+			weights[class] = {}
+			for _, s in ipairs(meta.specs) do weights[class][s.key] = G.WeightsFor(class, s.key, 60) end
+		end
+		emit({ classes = G.CLASSES, weights = weights, keys = G.STAT_KEYS, prof = G.PROFICIENCY })
+	"#,
+		Opts::default(),
+	);
 	let t = &out[0];
 	let keys: HashSet<&str> = t["keys"].as_array().unwrap().iter().map(|k| k.as_str().unwrap()).collect();
 	let mut classes: Vec<&str> = t["classes"].as_object().unwrap().keys().map(String::as_str).collect();
@@ -135,14 +145,14 @@ fn the_class_weight_table_nine_classes_three_specs_each_known_stat_keys_sane_pri
 			}
 		}
 	}
-	let n = |v: &Value| v.as_f64().unwrap_or(f64::NAN);
+	let n = |v: &Value| v.as_f64().unwrap_or(0.0);
 	let w = &t["weights"];
 	assert!(n(&w["WARRIOR"]["arms"]["str"]) > n(&w["WARRIOR"]["arms"]["int"]) || !truthy(&w["WARRIOR"]["arms"]["int"]));
 	assert!(n(&w["WARRIOR"]["protection"]["sta"]) >= n(&w["WARRIOR"]["protection"]["str"]) && n(&w["WARRIOR"]["protection"]["defense"]) > 0.0);
 	assert!(n(&w["MAGE"]["frost"]["int"]) > w["MAGE"]["frost"]["str"].as_f64().unwrap_or(0.0) && n(&w["MAGE"]["frost"]["spFrost"]) > 0.0);
 	assert!(n(&w["HUNTER"]["marksmanship"]["rdps"]) > n(&w["HUNTER"]["marksmanship"]["dps"]));
 	assert!(n(&w["PRIEST"]["holy"]["heal"]) > n(&w["PRIEST"]["holy"]["sp"]) && n(&w["PRIEST"]["shadow"]["sp"]) > n(&w["PRIEST"]["shadow"]["heal"]));
-	assert!(!truthy(&w["DRUID"]["feral"]["dps"]), "feral's weapon DPS weight comes from its attack power, in Gear.WeightsFor");
+	assert!(n(&w["DRUID"]["feral"]["dps"]) > 1.0, "Forever's forms hit with the weapon's DPS: Feral weighs it");
 	assert!(n(&w["ROGUE"]["combat"]["agi"]) >= n(&w["ROGUE"]["combat"]["str"]));
 }
 
@@ -159,14 +169,14 @@ fn single_slots_upgrade_downgrade_empty_slot_equipped_item() {
 		Opts::default(),
 	);
 	let (up, down, empty, worn) = (&out[0], &out[1], &out[2], &out[3]);
-	// Arms: str 1, sta 0.5, armor 0.02, spi 0.1
-	assert_eq!(r1(&up["old"]), 9.5);
-	assert_eq!(r1(&up["new"]), 15.4);
+	// Arms at 30 (the 30-34 band): str 1, sta 0.595, armor 0.03, spi 0.415
+	assert_eq!(r1(&up["old"]), 11.3);
+	assert_eq!(r1(&up["new"]), 17.5);
 	assert_eq!(up["slot"], 1);
-	assert_eq!(r1(&up["pct"]), 62.1);
-	assert_eq!(r1(&down["new"]), 1.1);
+	assert_eq!(r1(&up["pct"]), 54.9);
+	assert_eq!(r1(&down["new"]), 3.0);
 	assert!(down["pct"].as_f64().unwrap() < 0.0);
-	assert_eq!(json!([empty[0], r1(&empty[1])]), json!([true, 1.5])); // cloak into an empty back slot: no percentage
+	assert_eq!(json!([empty[0], r1(&empty[1])]), json!([true, 1.8])); // cloak into an empty back slot: no percentage
 	assert!(empty[2].is_null());
 	assert_eq!(worn["equipped"], true);
 }
@@ -185,7 +195,8 @@ fn rings_replace_the_weaker_ring_a_unique_ring_only_its_own_copy_trinkets_fill_a
 	);
 	let (ring, unique, trinket) = (&out[0], &out[1], &out[2]);
 	assert_eq!(ring["slot"], 12);
-	assert_eq!(json!([ring["old"], ring["new"], r1(&ring["pct"])]), json!([1, 2, 100.0]));
+	// 2 and 4 Stamina at Arms' 0.595
+	assert_eq!(json!([r1(&ring["old"]), r1(&ring["new"]), r1(&ring["pct"])]), json!([1.2, 2.4, 100.0]));
 	assert_eq!(unique["slot"], 11);
 	assert_eq!(unique["delta"], 0);
 	assert_eq!(trinket["empty"], true);
@@ -208,21 +219,21 @@ fn a_two_hander_is_weighed_against_main_hand_off_hand_and_a_one_hander_against_a
 		Opts::default(),
 	);
 	let (two_hand, upgrade, one_hand, one_hand_no_bag) = (&out[0], &out[1], &out[2], &out[3]);
-	// MH 9030: 2 str + 7.5 dps x 7 = 54.5; shield 9031: 3 sta x 0.5 + 500 armor x 0.02 = 11.5
-	assert_eq!(r1(&two_hand["old"]), 66.0);
-	// 2H 9032: 10 str + 16.7 dps x 7 = 126.9
-	assert_eq!(r1(&two_hand["new"]), 126.9);
+	// Arms at 30: MH 9030: 2 str + 7.5 dps x 6.365 = 49.74; shield 9031: 3 sta x 0.595 + 500 armor x 0.03 = 16.79
+	assert_eq!(r1(&two_hand["old"]), 66.5);
+	// 2H 9032: 10 str + 16.7 dps x 6.365 = 116.3
+	assert_eq!(r1(&two_hand["new"]), 116.3);
 	assert_eq!(two_hand["slot"], 16);
 	assert_eq!(upgrade[0], true);
-	assert_eq!(r1(&upgrade[2]), 92.3);
-	// 1H 9033: 3 agi x 0.6 + 9.4 dps x 7 = 67.6, plus the shield from the bags
-	assert_eq!(r1(&one_hand["old"]), 126.9);
-	assert_eq!(r1(&one_hand["new"]), 79.1);
-	assert_eq!(r1(&one_hand_no_bag["new"]), 67.6);
+	assert_eq!(r1(&upgrade[2]), 74.8);
+	// 1H 9033: 3 agi x 0.735 + 9.4 dps x 6.365 = 62.0, plus the shield from the bags
+	assert_eq!(r1(&one_hand["old"]), 116.3);
+	assert_eq!(r1(&one_hand["new"]), 78.8);
+	assert_eq!(r1(&one_hand_no_bag["new"]), 62.0);
 }
 
 #[test]
-fn dual_wielders_try_a_one_hander_in_the_off_hand_at_half_weapon_dps() {
+fn dual_wielders_try_a_one_hander_in_the_off_hand_at_their_off_hand_weight() {
 	let out = run(
 		r#"
 		Polestar.Set("gear.spec.WARRIOR", "fury")
@@ -234,12 +245,14 @@ fn dual_wielders_try_a_one_hander_in_the_off_hand_at_half_weapon_dps() {
 		Opts::default(),
 	);
 	let (dw, no_dw) = (&out[0], &out[1]);
-	// Fury: off hand empty -> 3 agi x 0.65 + 9.4 x 6.5 x 0.5 = 32.5 beats the main-hand gain (63.05 - 50.75)
+	// Fury at 30: off hand empty -> 3 agi x 0.65 + 9.4 x 2.55 (Fury's off-hand weapon DPS weight) = 25.9 beats the
+	// main-hand gain (3 x 0.65 + 9.4 x 4.45 - 2 - 7.5 x 4.45 = 8.4)
 	assert_eq!(dw["slot"], 17);
 	assert_eq!(dw["empty"], true);
-	assert_eq!(r1(&dw["new"]), 32.5);
-	assert_eq!(no_dw["slot"], 16); // no Dual Wield before level 20
-	assert_eq!(r1(&no_dw["delta"]), 12.3);
+	assert_eq!(r1(&dw["new"]), 25.9);
+	// No Dual Wield before level 20. At 12 (the 10-14 band): 3 x 0.34 + 9.4 x 6.96 - 2 - 7.5 x 6.96
+	assert_eq!(no_dw["slot"], 16);
+	assert_eq!(r1(&no_dw["delta"]), 12.2);
 }
 
 #[test]
@@ -534,11 +547,13 @@ fn shaman(level: i32) -> Opts {
 }
 
 // #2090: Mental Dexterity (Enhancement, 3 ranks, talent spell 415140) turns 33/66/100% of Intellect into attack power
-// (the 12 November patch notes). The weights' sources know no Forever talent, so Intellect counted only for mana: each
-// rank now adds a third of the attack power weight to it, on whichever built-in weights are in use (Elemental's carry
-// almost no attack power), never on a custom scale; /polestar gear spec says what it added.
+// since 12 November 2026 (the client's hotfix data, talent curve 85272; 50/100/150% before). The bands' Intellect
+// (Forever Leveling BiS v1.2.7, made 11 November) counts it at 3/3 and 150% from the 15-19 band on, so Gear.BandFor
+// takes 1.5 x the attack power weight out there; each rank bought then adds its share of the attack power weight, on
+// whichever built-in weights are in use (Elemental's carry no attack power), never on a custom scale; /polestar gear
+// spec says what it added.
 #[test]
-fn mental_dexterity_adds_a_third_of_the_attack_power_weight_to_intellect_per_rank_on_the_built_in_weights() {
+fn mental_dexterity_adds_33_66_100_percent_of_the_attack_power_weight_to_intellect_on_the_built_in_weights() {
 	let out = run(
 		r#"
 		local function w() local x = G.GetWeights(); return { int = x.int, ap = x.ap or 0 } end
@@ -566,18 +581,18 @@ fn mental_dexterity_adds_a_third_of_the_attack_power_weight_to_intellect_per_ran
 	);
 	let o = &out[0];
 	assert_eq!(o["spec"], json!(["enhancement", "Enhancement", "talents"]));
-	// Level 45: the 40-49 band, Intellect 0.179, attack power 0.468.
+	// Level 45: the 45-49 band. Intellect 2.09 less 1.5 x attack power 1, over Strength 2: 0.295; attack power 0.5.
 	let seen = o["seen"].as_array().unwrap();
 	let (int0, ap) = (seen[0]["int"].as_f64().unwrap(), seen[0]["ap"].as_f64().unwrap());
-	assert!((int0 - 0.179).abs() < 1e-9 && (ap - 0.468).abs() < 1e-9, "{o}");
+	assert!((int0 - 0.295).abs() < 1e-9 && (ap - 0.5).abs() < 1e-9, "{o}");
 	for (r, s) in seen.iter().enumerate() {
-		let want = int0 + ap * r as f64 / 3.0;
+		let want = int0 + ap * [0.0, 0.33, 0.66, 1.0][r];
 		assert!((s["int"].as_f64().unwrap() - want).abs() < 1e-9, "{r} ranks: Intellect {} (want {want})", s["int"]);
 		assert!((s["ap"].as_f64().unwrap() - ap).abs() < 1e-9, "{r} ranks: attack power unchanged");
 	}
-	assert!(is_match(text(&o["report"]), r"^  Talents in the weights: .+ 3/3, Intellect \+0\.47$"), "{}", o["report"]);
+	assert!(is_match(text(&o["report"]), r"^  Talents in the weights: .+ 3/3, Intellect \+0\.50$"), "{}", o["report"]);
 	let ele = &o["ele"];
-	assert!((ele["int"].as_f64().unwrap() - 0.563).abs() < 1e-9, "Elemental's band carries no attack power: {ele}");
+	assert!((ele["int"].as_f64().unwrap() - 0.25).abs() < 1e-9, "Elemental's band carries no attack power: {ele}");
 	assert_eq!(o["custom"][0], o["custom"][1], "a custom scale is used as it is: {}", o["custom"]);
 }
 
@@ -669,10 +684,11 @@ fn tooltip_line_upgrade_and_downgrade_percentages_empty_slot_later_level_skipped
 	);
 	// The slot it replaces follows the gain; an empty slot needs no name. Under it, the weights it was scored with.
 	let scored = "Scored for Arms until you spend talent points";
-	assert_eq!(out[0], json!(["Polestar | +62% upgrade · Head", scored]));
-	assert_eq!(out[1], json!(["Polestar | -88% downgrade · Head", scored]));
+	// Arms at 30: 9001 scores 11.285, 9002 17.48, 9004 2.975, plate 9005 21.76.
+	assert_eq!(out[0], json!(["Polestar | +55% upgrade · Head", scored]));
+	assert_eq!(out[1], json!(["Polestar | -74% downgrade · Head", scored]));
 	assert_eq!(out[2], json!(["Polestar | upgrade (empty slot)", scored]));
-	assert_eq!(out[3], json!(["Polestar | +89% upgrade at level 40 · Head", scored]));
+	assert_eq!(out[3], json!(["Polestar | +93% upgrade at level 40 · Head", scored]));
 	assert_eq!(out[4], json!({}));
 	assert_eq!(out[5], json!({}));
 	assert_eq!(out[6], json!({}));
@@ -714,9 +730,9 @@ fn quest_reward_tooltips_hovering_a_choice_setquestitem_setquestlogitem_shows_th
 		Opts::default(),
 	);
 	let scored = "Scored for Arms until you spend talent points";
-	assert_eq!(out[0], json!([["Polestar | -88% downgrade · Head", scored], ["Polestar | +62% upgrade · Head", scored]]));
-	assert_eq!(out[1], json!(["Polestar | +62% upgrade · Head", scored]));
-	assert_eq!(out[2], json!(["Polestar | +62% upgrade · Head", scored]));
+	assert_eq!(out[0], json!([["Polestar | -74% downgrade · Head", scored], ["Polestar | +55% upgrade · Head", scored]]));
+	assert_eq!(out[1], json!(["Polestar | +55% upgrade · Head", scored]));
+	assert_eq!(out[2], json!(["Polestar | +55% upgrade · Head", scored]));
 	assert_eq!(out[3], json!({}));
 }
 
@@ -913,9 +929,12 @@ fn specs_with_no_melee_weapon_dps_weight_get_a_small_one_a_harder_hitting_staff_
 	};
 	let druid = probe("DRUID", "Druid", 11, "balance");
 	assert_eq!(druid["up"], true, "the cane beats the knife on weapon DPS alone");
-	assert_eq!(druid["w"], 0.01);
-	assert_eq!(probe("PRIEST", "Priest", 5, "shadow")["up"], true);
-	assert_eq!(probe("WARRIOR", "Warrior", 1, "arms")["w"], 7, "a weight the spec has is never changed");
+	assert_eq!(druid["w"], 0.24, "Balance's 1-9 band weighs the weapon itself");
+	let priest = probe("PRIEST", "Priest", 5, "shadow");
+	assert_eq!(priest["up"], true);
+	assert_eq!(priest["w"], 0.01, "Shadow's band has no melee weapon DPS: the tiebreak");
+	let arms = probe("WARRIOR", "Warrior", 1, "arms")["w"].as_f64().unwrap();
+	assert!((arms - 6.385).abs() < 1e-9, "a weight the spec has is never changed: {arms}");
 }
 
 const WAND: &str = r#"g.defineItem("item:7101", { equipLoc = "INVTYPE_RANGEDRIGHT", classID = 2, subclassID = 19, minLevel = 5, stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 3.1 } })"#;
@@ -971,21 +990,18 @@ fn the_melee_dps_weight_is_only_a_tiebreaker_a_stat_on_the_item_outweighs_any_we
 }
 
 #[test]
-fn feral_weighs_weapon_dps_at_14_attack_power_before_and_after_bear_form_balance_keeps_the_tiebreaker() {
-	// In Forever, Cat, Bear and Dire Bear Form hit with the equipped weapon's DPS (#731).
+fn feral_weighs_weapon_dps_with_its_bands_own_weight_at_every_level_balance_past_19_keeps_the_tiebreaker() {
+	// In Forever, Cat, Bear and Dire Bear Form hit with the equipped weapon's DPS (#731); the bands weigh it.
 	let w = |spec: &str, level: i32| {
 		let script = format!("\n\t\tPolestar.Set(\"gear.spec.DRUID\", \"{spec}\")\n\t\tlocal w = G.GetWeights()\n\t\temit({{ dps = w.dps or false, ap = w.ap or false }})\n\t");
 		run(&script, Opts { cls: "DRUID", class_name: "Druid", class_id: 11, level, ..Default::default() }).remove(0)
 	};
-	assert_eq!(w("feral", 9)["dps"], 7, "before any form the Druid fights with the weapon");
-	assert_eq!(w("feral", 10)["dps"], 7, "cat and bear damage follows the weapon's DPS");
-	assert_eq!(w("feral", 24)["dps"], 7, "the same as Arms");
-	for level in [30, 45, 55, 60] {
-		let f = w("feral", level);
-		let (dps, ap) = (f["dps"].as_f64().unwrap(), f["ap"].as_f64().unwrap());
-		assert!((dps - 14.0 * ap).abs() < 1e-9, "level {level}: 14 attack power per weapon DPS ({dps} vs ap {ap})");
+	// Strength-units: 6.88 at 1-9, 6.96 at 10-14, 6.41 at 20-24, 5.96 at 30-34, 4.74 at 45-49, 4.52 at 55-59, 4.40 at 60
+	for (level, want) in [(9, 6.88), (10, 6.96), (24, 6.41), (30, 5.96), (45, 4.744), (55, 4.518), (60, 4.405)] {
+		let dps = w("feral", level)["dps"].as_f64().unwrap();
+		assert!((dps - want).abs() < 0.001, "level {level}: weapon DPS {dps}, want {want}");
 	}
-	assert_eq!(w("balance", 20)["dps"], 0.01);
+	assert_eq!(w("balance", 20)["dps"], 0.01, "Balance's bands weigh no melee weapon from 15 on");
 }
 
 #[test]
@@ -1028,9 +1044,10 @@ const AXE_AND_DAGGER: &str = r#"
 fn an_orc_hunters_axe_specialization_counts_by_how_much_a_hunter_fights_in_melee() {
 	let orc = |cls: &'static str, class_name: &'static str, class_id: i32| Opts { cls, class_name, class_id, level: 13, race: "Orc", race_id: 2, ..Opts::default() };
 	let hunter = run(AXE_AND_DAGGER, orc("HUNTER", "Hunter", 3));
-	// 2.9 x 0.5 + 10 x 1% x (0.5 / 6.5); 6.0 x 0.5 + 0.1.
-	assert_eq!(hunter[0], json!({ "axe": 2.22, "dagger": 3.1 }));
-	assert_eq!(hunter[1], json!(["Polestar | +40% upgrade · Main Hand", "Scored for Beast Mastery until you spend talent points"]));
+	// The 10-14 band, Agility 1: 2.9 x 0.227 (melee weapon DPS) + 1.948 (crit) x 1% x (0.227 / 4.734, the bow's);
+	// 6.0 x 0.227 + 1 x 0.017 (Strength).
+	assert_eq!(hunter[0], json!({ "axe": 0.75, "dagger": 1.38 }));
+	assert_eq!(hunter[1], json!(["Polestar | +83% upgrade · Main Hand", "Scored for Beast Mastery until you spend talent points"]));
 	// A Warrior fights with the axe: Axe Specialization counts whole (the dagger's double DPS still wins).
 	let warrior = run(AXE_AND_DAGGER, orc("WARRIOR", "Warrior", 1));
 	let (axe, dagger) = (warrior[0]["axe"].as_f64().unwrap(), warrior[0]["dagger"].as_f64().unwrap());

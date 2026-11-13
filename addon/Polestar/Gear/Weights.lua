@@ -1,67 +1,32 @@
--- Leveling stat weights per class and talent spec, and what each class can
--- wear: Polestar's own. Gear advice uses them where a spec has no level band
--- (Gear.WEIGHT_BANDS, SpecData.lua), and in every band for Forever's own
--- ratings, which no simulation has (haste, expertise, armorPen; #1529). A
--- player changes them for themselves with Adjust weights (Adjust.lua).
+-- Stat weights per class, talent spec and level band, and what each class can
+-- wear.
 --
--- Checked against Forever's own client tables (build 1.60.1.70862, read with
--- `forge gamedata`), which agree with the Classic formulas below:
---   * ChrClasses: attack power per Strength 2 (Warrior, Paladin, Shaman,
---     Druid) or 1 (Hunter, Rogue, casters), per Agility 1 (Hunter, Rogue),
---     ranged attack power per Agility 2 (Warrior, Hunter, Rogue: Warriors and
---     Rogues get 2 in Forever, 1 in Classic; no spec here weighs it).
---   * PlayerExpectedStat: Agility per 1% crit at 60 is 20 (Warrior, Paladin,
---     Priest, Shaman, Mage, Warlock, Druid), 29 (Rogue), 53 (Hunter);
---     Intellect per 1% spell crit about 60; 10 health per Stamina. Both
---     conversions are much richer at low level (4 Agility per 1% for a level
---     1 Warrior), and so is every percent's worth to a character that deals
---     and takes little damage, which is why the weights do not change by level.
---   * gametables/combatratings.txt: rating points per 1%, the same at every
---     level: crit 14, hit 10, haste 10, expertise 10, armor penetration 10,
---     dodge 12, parry 15, block 5; 1 defense rating is 1 defense skill. Gear.lua
---     (live item stats) and the item data divide a rating by these, so the
---     weights below stay per 1%. Forever unifies hit and crit: a plain hit or
---     crit rating counts for melee, ranged and spells.
+-- Stat weights from Forever Leveling BiS by Thunder, used with the author's
+-- permission (2026-11-13): its numbers per spec and band are in WeightBands.lua.
+-- Gear.BandFor below turns a band into Polestar's stat keys with the spec's
+-- main stat at 1 (Gear.MAIN_STAT) and fills in the stats Forever Leveling BiS
+-- leaves out from the game's formulas: health, mana, health per 5 seconds and
+-- armor penetration are Polestar's own (each band lists them in `ours`).
+-- docs/gear-weights.md explains every step and gives the weights at levels 10
+-- to 60. A player changes them for themselves with Adjust weights (Adjust.lua).
 --
--- Forever's ratings Classic does not have, per 1%, set from the spec's own
--- crit and hit weights:
---   * haste: faster swings or casts. A melee spec's specials are not hasted,
---     so 1% haste is about 0.6 of 1% crit (0.7 for a Hunter, whose damage is
---     mostly Auto Shot); a caster's about 0.8 of 1% spell crit (mana runs out
---     sooner while levelling), more for specs whose crit counts for little
---     (Shadow, Affliction, Demonology); a healer's about 0.6.
---   * expertise: 1% less dodge (and parry from the front) is about 0.9 of 1%
---     hit for melee; next to nothing for a Hunter, nothing for casters.
---   * armorPen: 1% of a mob's armor ignored is worth about a third of 1% crit
---     to physical damage (levelling mobs' armor takes 15-35% off a hit).
---
--- How the numbers were set. One point of the spec's main stat is ~1.0 and
--- everything else is "worth this many points of it" while levelling (solo
--- questing first, dungeons second):
---   * Melee attack power: Warrior/Paladin/Shaman/Druid get 2 AP per Strength,
---     Rogues and Hunters 1 AP per Strength and 1 AP per Agility (Hunters also
---     2 ranged AP per Agility). 14 AP = 1 weapon DPS, so 1 weapon DPS is worth
---     ~7 Strength to a Warrior; less for hybrids that also cast.
---   * Agility: crit (about 1% per 20 Agility for Warriors/Paladins/Druids at
---     60, 29 for Rogues, 53 for Hunters, better at low level) plus 2 armor.
---   * Stamina: 10 health. Valued higher for solo survival than raid lists do.
---   * Intellect: 15 mana and a little spell crit. Spirit: out-of-combat
---     regeneration (the 5-second rule), worth a lot to Priests, Mages and
---     Warlocks while levelling, little to melee.
---   * Percent stats (crit, hit, spellCrit, spellHit, dodge, parry, block) are
---     per 1%; mp5/hp5 per point per 5 seconds; weapon DPS per 1 DPS.
---   * dps = the melee weapon's DPS (main hand; the off hand counts half, its
---     damage penalty), rdps = the ranged slot's DPS (bows, guns, crossbows,
---     thrown, wands). Feral has no dps here: Gear.WeightsFor gives it 14x its
---     attack power weight, since Forever's forms hit with the weapon's DPS.
---   * sp = spell damage of every school, spFire etc. = one school only, heal =
---     healing. Classic +spell-power items carry both sp and heal, so damage
---     specs read the sp half and healers the heal half.
+-- Units: one point of the main stat is 1 and every other weight is "worth this
+-- many points of it". Percent stats (crit, hit, spellCrit, spellHit, haste,
+-- expertise, armorPen, dodge, parry, block) are per 1%: an item's ratings are
+-- read at the client's rating per 1% (Gear.RATINGS, Gear.lua). mp5 and hp5 are
+-- per point per 5 seconds; dps is the main hand's (or two-hander's) weapon DPS,
+-- ohDps the off hand's (a spec without it counts the off hand at half of dps,
+-- its damage penalty), rdps the ranged slot's (bows, guns, crossbows, thrown,
+-- wands); sp is spell damage of every school, spFire and the like one
+-- school only, heal is healing. A +spell power item carries both sp and heal,
+-- so damage specs weigh sp and healers heal.
 
 local ADDON, ns = ...
 
 local Gear = ns.Gear or {}
 ns.Gear = Gear
+
+local type, pairs, ipairs, max, floor = type, pairs, ipairs, math.max, math.floor
 
 -- Stat keys a weight table may use (also the canonical item stat keys).
 Gear.STAT_KEYS = {
@@ -69,7 +34,7 @@ Gear.STAT_KEYS = {
 	"ap", "rap", "sp", "spArcane", "spFire", "spFrost", "spHoly", "spNature", "spShadow", "heal",
 	"crit", "hit", "spellCrit", "spellHit", "mp5", "hp5", "defense", "dodge", "parry", "block", "blockValue",
 	"haste", "expertise", "armorPen",
-	"dps", "rdps",
+	"dps", "ohDps", "rdps",
 }
 
 -- Specs in talent order: Forever's talent columns left to right, the same as
@@ -124,80 +89,183 @@ Gear.CLASSES = {
 	} },
 }
 
-Gear.WEIGHTS = {
-	WARRIOR = {
-		arms = { str = 1, agi = 0.6, sta = 0.5, spi = 0.1, armor = 0.02, ap = 0.5, crit = 10, hit = 9, dps = 7, rdps = 0.5,
-			hp5 = 1, health = 0.05, defense = 0.2, dodge = 3, parry = 3, block = 0.3, blockValue = 0.05, haste = 6, expertise = 8.1, armorPen = 3 },
-		fury = { str = 1, agi = 0.65, sta = 0.5, spi = 0.1, armor = 0.02, ap = 0.5, crit = 11, hit = 11, dps = 6.5, rdps = 0.5,
-			hp5 = 1, health = 0.05, defense = 0.2, dodge = 3, parry = 3, haste = 6.6, expertise = 9.9, armorPen = 3.3 },
-		protection = { sta = 1, str = 0.6, agi = 0.7, armor = 0.06, defense = 1.2, dodge = 12, parry = 12, block = 8, blockValue = 0.5,
-			hit = 6, crit = 4, ap = 0.25, dps = 2.5, rdps = 0.3, hp5 = 1.5, health = 0.1, spi = 0.05, haste = 2, expertise = 5.4, armorPen = 1 },
-	},
-	PALADIN = {
-		holy = { int = 1, heal = 0.65, sp = 0.15, spHoly = 0.1, mp5 = 2.2, spi = 0.5, sta = 0.45, spellCrit = 7, str = 0.15,
-			armor = 0.005, dps = 0.5, health = 0.05, mana = 0.06, haste = 4.2 },
-		protection = { sta = 1, armor = 0.05, defense = 1, dodge = 10, parry = 10, block = 6, blockValue = 0.4, str = 0.5, agi = 0.5,
-			int = 0.4, sp = 0.5, spHoly = 0.5, spellHit = 4, hit = 4, mp5 = 1, dps = 2, health = 0.1, haste = 2, expertise = 3.6, armorPen = 1 },
-		retribution = { str = 1, agi = 0.55, sta = 0.5, int = 0.35, spi = 0.15, armor = 0.02, ap = 0.5, crit = 9, hit = 9,
-			sp = 0.3, spHoly = 0.3, mp5 = 1, dps = 7, hp5 = 0.5, health = 0.05, mana = 0.02, haste = 5.4, expertise = 8.1, armorPen = 2.7 },
-	},
-	HUNTER = {
-		beastmastery = { agi = 1, rap = 0.45, ap = 0.5, crit = 10, hit = 10, rdps = 6.5, sta = 0.55, int = 0.35, spi = 0.2,
-			str = 0.1, armor = 0.02, mp5 = 1.2, dps = 0.5, mana = 0.02, health = 0.05, haste = 7, expertise = 0.5, armorPen = 3 },
-		marksmanship = { agi = 1, rap = 0.45, ap = 0.5, crit = 11, hit = 11, rdps = 7, sta = 0.5, int = 0.4, spi = 0.2,
-			str = 0.1, armor = 0.02, mp5 = 1.2, dps = 0.5, mana = 0.02, health = 0.05, haste = 7.7, expertise = 0.5, armorPen = 3.3 },
-		survival = { agi = 1.1, rap = 0.45, ap = 0.55, crit = 11, hit = 10, rdps = 6.5, sta = 0.55, int = 0.35, spi = 0.2,
-			str = 0.15, armor = 0.02, mp5 = 1, dps = 1, mana = 0.02, health = 0.05, haste = 7.7, expertise = 1, armorPen = 3.3 },
-	},
-	ROGUE = {
-		assassination = { agi = 1, str = 0.55, ap = 0.55, crit = 11, hit = 11, dps = 5.5, sta = 0.45, armor = 0.02, dodge = 2,
-			rdps = 0.4, hp5 = 0.5, health = 0.05, spi = 0.05, haste = 6.6, expertise = 9.9, armorPen = 3.3 },
-		combat = { agi = 1, str = 0.55, ap = 0.55, crit = 10, hit = 12, dps = 6, sta = 0.45, armor = 0.02, dodge = 2,
-			rdps = 0.4, hp5 = 0.5, health = 0.05, spi = 0.05, haste = 6, expertise = 10.8, armorPen = 3 },
-		subtlety = { agi = 1, str = 0.5, ap = 0.5, crit = 10, hit = 10, dps = 5.5, sta = 0.5, armor = 0.02, dodge = 2,
-			rdps = 0.4, hp5 = 0.5, health = 0.05, spi = 0.05, haste = 6, expertise = 9, armorPen = 3 },
-	},
-	PRIEST = {
-		discipline = { int = 1, spi = 0.8, heal = 0.55, sp = 0.45, mp5 = 2, sta = 0.5, spellCrit = 6, spellHit = 3, rdps = 2.5,
-			armor = 0.005, mana = 0.06, health = 0.05, haste = 3.6 },
-		holy = { int = 1, spi = 0.85, heal = 0.7, sp = 0.3, mp5 = 2.2, sta = 0.45, spellCrit = 6, rdps = 2, armor = 0.005,
-			mana = 0.06, health = 0.05, haste = 3.6 },
-		shadow = { int = 0.85, spi = 0.9, sta = 0.65, sp = 1, spShadow = 1, spellHit = 9, spellCrit = 3, mp5 = 1.8, rdps = 3,
-			heal = 0.05, armor = 0.005, mana = 0.05, health = 0.06, haste = 4 },
-	},
-	SHAMAN = {
-		elemental = { int = 1, sp = 0.9, spNature = 0.9, spFire = 0.3, spFrost = 0.2, spellCrit = 8, spellHit = 8, mp5 = 2,
-			spi = 0.35, sta = 0.5, str = 0.2, agi = 0.15, armor = 0.01, dps = 1.5, mana = 0.06, health = 0.05, haste = 6.4 },
-		enhancement = { str = 1, agi = 0.7, ap = 0.5, crit = 9, hit = 9, dps = 7, sta = 0.5, int = 0.35, spi = 0.15, armor = 0.02,
-			mp5 = 1, sp = 0.15, spNature = 0.15, block = 0.3, health = 0.05, mana = 0.02, haste = 5.4, expertise = 8.1, armorPen = 2.7 },
-		restoration = { int = 1, heal = 0.7, mp5 = 2.4, spi = 0.35, sta = 0.45, spellCrit = 6, sp = 0.1, armor = 0.005, dps = 0.5,
-			mana = 0.06, health = 0.05, haste = 3.6 },
-	},
-	MAGE = {
-		arcane = { int = 1, sp = 1.1, spArcane = 1.1, spFire = 0.4, spFrost = 0.4, spellCrit = 7, spellHit = 9, spi = 0.55,
-			sta = 0.55, mp5 = 1.8, rdps = 1.5, armor = 0.005, mana = 0.07, health = 0.05, haste = 5.6 },
-		fire = { int = 0.9, sp = 1.1, spFire = 1.1, spFrost = 0.2, spArcane = 0.2, spellCrit = 9, spellHit = 9, spi = 0.5,
-			sta = 0.55, mp5 = 1.6, rdps = 1.5, armor = 0.005, mana = 0.06, health = 0.05, haste = 7.2 },
-		frost = { int = 0.9, sp = 1.1, spFrost = 1.1, spFire = 0.2, spArcane = 0.2, spellCrit = 6, spellHit = 9, spi = 0.6,
-			sta = 0.6, mp5 = 1.8, rdps = 1.5, armor = 0.005, mana = 0.06, health = 0.06, haste = 4.8 },
-	},
-	WARLOCK = {
-		affliction = { sta = 0.8, int = 0.75, spi = 0.6, sp = 1, spShadow = 1, spFire = 0.2, spellHit = 9, spellCrit = 3,
-			mp5 = 1, rdps = 2, armor = 0.005, health = 0.08, mana = 0.05, haste = 4 },
-		demonology = { sta = 1, int = 0.75, spi = 0.55, sp = 0.85, spShadow = 0.85, spFire = 0.2, spellHit = 8, spellCrit = 3,
-			mp5 = 1, rdps = 2, armor = 0.005, health = 0.1, mana = 0.05, haste = 4 },
-		destruction = { sta = 0.7, int = 0.85, spi = 0.4, sp = 1, spShadow = 0.8, spFire = 0.6, spellHit = 9, spellCrit = 7,
-			mp5 = 1, rdps = 2, armor = 0.005, health = 0.07, mana = 0.05, haste = 5.6 },
-	},
-	DRUID = {
-		balance = { int = 1, sp = 0.9, spNature = 0.9, spArcane = 0.7, spellCrit = 6, spellHit = 8, spi = 0.5, sta = 0.5, mp5 = 2,
-			heal = 0.1, armor = 0.005, mana = 0.06, health = 0.05, haste = 4.8 },
-		feral = { str = 1, agi = 1, ap = 0.5, crit = 9, hit = 9, sta = 0.65, armor = 0.04, defense = 0.4, dodge = 6, int = 0.2,
-			spi = 0.15, hp5 = 0.5, health = 0.07, haste = 5.4, expertise = 8.1, armorPen = 2.7 },
-		restoration = { int = 1, heal = 0.7, spi = 0.65, mp5 = 2.2, sta = 0.45, spellCrit = 4, sp = 0.1, armor = 0.005,
-			mana = 0.06, health = 0.05, haste = 2.4 },
-	},
+-- The stat each spec's weights hold at 1: the attribute its attack power
+-- comes from for weapon specs, Stamina for tanks, spell damage for casters and
+-- healing for healers. A spec with sp or heal here takes its crit and hit as
+-- spell crit and spell hit; every other spec as melee and ranged crit and hit.
+Gear.MAIN_STAT = {
+	WARRIOR = { arms = "str", fury = "str", protection = "sta" },
+	PALADIN = { holy = "heal", protection = "sta", retribution = "str" },
+	HUNTER = { beastmastery = "agi", marksmanship = "agi", survival = "agi" },
+	ROGUE = { assassination = "agi", combat = "agi", subtlety = "agi" },
+	PRIEST = { discipline = "heal", holy = "heal", shadow = "sp" },
+	SHAMAN = { elemental = "sp", enhancement = "str", restoration = "heal" },
+	MAGE = { arcane = "sp", fire = "sp", frost = "sp" },
+	WARLOCK = { affliction = "sp", demonology = "sp", destruction = "sp" },
+	DRUID = { balance = "sp", feral = "str", restoration = "heal" },
 }
+
+-- Talents that turn one stat into another (Forever's talent tree): by class,
+-- the talent's spell, its ranks and the share of `from` that counts as `into`
+-- at each rank. Gear.lua adds `into`'s weight times the share for the ranks
+-- bought to `from`, on the built-in weights in use (a custom scale is used as
+-- it is). `source`: the band numbers already count the talent for this spec
+-- from that level at that share; Gear.BandFor takes it out first, so the ranks
+-- the player has count instead.
+--   Mental Dexterity (Shaman, 3 ranks, the Enhancement column's second row):
+--   33/66/100% of Intellect as attack power since 12 November 2026 (the
+--   client's hotfix data, talent curve 85272; #2090), 50/100/150% before.
+--   Forever Leveling BiS v1.2.7's numbers were made on 11 November: its
+--   Enhancement Intellect counts the talent at 3/3 and 150% from the 15-19 band
+--   on (5 points in the tree reach the second row at level 15).
+Gear.TALENT_STATS = {
+	SHAMAN = { { spell = 415140, ranks = 3, from = "int", into = "ap", shares = { 0.33, 0.66, 1 },
+		source = { spec = "enhancement", level = 15, share = 1.5 } } },
+}
+
+-- Forever Leveling BiS's stat names -> Polestar's. crit and hit go to
+-- spellCrit and spellHit for casters and healers (Gear.MAIN_STAT); sp and heal
+-- come from its damage and healing numbers; haste and expertise from its
+-- rating numbers (below).
+local NAMES = {
+	str = "str", agi = "agi", sta = "sta", int = "int", spi = "spi", armor = "armor",
+	atkpwr = "ap", rgdatkpwr = "rap",
+	arcsplpwr = "spArcane", firsplpwr = "spFire", frosplpwr = "spFrost", holsplpwr = "spHoly", natsplpwr = "spNature", shasplpwr = "spShadow",
+	manargn = "mp5", dps = "dps", ohDps = "ohDps", rangedDps = "rdps",
+	defrtng = "defense", dodgePct = "dodge", parryPct = "parry", blockPct = "block", block = "blockValue",
+}
+
+-- The game's own numbers the stats Forever Leveling BiS leaves out are made from:
+local HEALTH_PER_STA = 10 -- gametables/hppersta.txt, every level (1.60.1.70888)
+local MANA_PER_INT = 15 -- each point of Intellect past the first 20
+local HP5_HEALTH = 5 -- 1 health per 5 seconds restores 5 over a 25-second fight
+-- Intellect per 1% spell crit at level 60; at level L it takes
+-- (0.2 + 0.8 (L - 1) / 59) of that (Classic's formula, as the community
+-- TrinityCore server for Forever has it).
+local INT_PER_SPELL_CRIT = { MAGE = 59.5, PRIEST = 59.2, WARLOCK = 60.6, DRUID = 60, SHAMAN = 59.5, PALADIN = 54, HUNTER = 60 }
+-- A same-level mob's armor at levels 1 to 60 (the Forever TrinityCore world
+-- database's Classic creature stats, melee mobs). It takes
+-- armor / (armor + 400 + 85 x attacker level) off a physical hit.
+local MOB_ARMOR = { 0, 0, 25, 60, 103, 156, 221, 297, 386, 492, 518, 552, 585, 619, 653, 688, 722, 755, 789, 822,
+	858, 892, 925, 959, 992, 1026, 1061, 1093, 1127, 1160, 1194, 1229, 1261, 1296, 1328, 1434, 1546, 1661, 1785, 1914,
+	2049, 2193, 2343, 2502, 2668, 2723, 2776, 2828, 2883, 2936, 2988, 3043, 3096, 3148, 3201, 3256, 3308, 3361, 3414, 3466 }
+
+-- The share of a physical hit a same-level mob's armor takes at `level`.
+function Gear.ArmorShare(level)
+	local a = MOB_ARMOR[level] or MOB_ARMOR[#MOB_ARMOR]
+	return a / (a + 400 + 85 * level)
+end
+
+-- Intellect per 1% spell crit for `class` at `level` (nil: no spell crit from Intellect).
+function Gear.IntPerSpellCrit(class, level)
+	local r = INT_PER_SPELL_CRIT[class]
+	return r and r * (0.2 + 0.8 * (level - 1) / 59) or nil
+end
+
+-- Whether Polestar has weights for the class (and spec).
+function Gear.HasWeights(class, key)
+	local c = type(class) == "string" and Gear.WEIGHT_BANDS and Gear.WEIGHT_BANDS[class]
+	if not c then return false end
+	return key == nil or c[key] ~= nil
+end
+
+local names = {} -- a spec's name list (its first entry) -> its names, split once
+
+local function namesOf(spec)
+	local list = names[spec]
+	if not list then
+		list = {}
+		for n in spec[1]:gmatch("%S+") do list[#list + 1] = n end
+		names[spec] = list
+	end
+	return list
+end
+
+-- One band in Polestar's keys, with the spec's main stat at 1, for the levels
+-- `from` to band[1]. -> weights, info { source, from, upTo, ours }
+local function readBand(class, key, spec, band, from)
+	local r = {}
+	for i, n in ipairs(namesOf(spec)) do r[n] = band[i + 1] or 0 end
+	local main = Gear.MAIN_STAT[class][key]
+	local caster = main == "sp" or main == "heal"
+	local w = {}
+	for n, v in pairs(r) do
+		local k = NAMES[n]
+		if k and v ~= 0 then w[k] = v end
+	end
+	-- Spell damage and healing: "+spell power" (damage and healing) is worth
+	-- the two together, so each takes its own number.
+	local splpwr, spldmg, splheal = r.splpwr or 0, r.spldmg, r.splheal
+	local sp = spldmg or max(0, splpwr - (splheal or 0))
+	local heal = splheal or max(0, splpwr - (spldmg or 0))
+	if sp > 0 then w.sp = sp end
+	if heal > 0 then w.heal = heal end
+	local crit, hit = r.critPct or 0, r.hitPct or 0
+	if crit > 0 then w[caster and "spellCrit" or "crit"] = crit end
+	if hit > 0 then w[caster and "spellHit" or "hit"] = hit end
+	-- Haste and expertise come per rating point, at the rating per 1% the
+	-- numbers were made with, which the crit numbers give (1% crit against
+	-- crit rating); the client's table takes 14 crit, 10 haste and 10
+	-- expertise rating per 1% at every level (Gear.RATING_RATE).
+	local rate = Gear.RATING_RATE or {}
+	local critRating = r.critstrkrtng or 0
+	local per = critRating > 0 and crit / ((rate.crit or 14) * critRating) or 1
+	if (r.hastertng or 0) > 0 then w.haste = r.hastertng * (rate.haste or 10) * per end
+	if (r.exprtng or 0) > 0 then w.expertise = r.exprtng * (rate.expertise or 10) * per end
+	-- A talent the numbers count at a share the game has changed since.
+	for _, t in ipairs(Gear.TALENT_STATS[class] or {}) do
+		local src = t.source
+		if src and src.spec == key and from >= src.level and w[t.into] then
+			w[t.from] = max(0, (w[t.from] or 0) - src.share * w[t.into])
+		end
+	end
+	-- Polestar's own, from the game's formulas, at the band's middle level.
+	local level = floor((from + band[1]) / 2 + 0.5)
+	local ours = {}
+	local function own(k, v)
+		if v > 0 then
+			w[k] = v
+			ours[k] = true
+		end
+	end
+	own("health", (w.sta or 0) / HEALTH_PER_STA)
+	local perCrit = Gear.IntPerSpellCrit(class, level)
+	if perCrit then own("mana", max(0, (w.int or 0) - (w.spellCrit or 0) / perCrit) / MANA_PER_INT) end
+	own("hp5", (w.health or 0) * HP5_HEALTH)
+	if not caster then own("armorPen", (w.crit or 0) * Gear.ArmorShare(level)) end
+	local m = w[main]
+	if m and m > 0 then
+		for k, v in pairs(w) do w[k] = v / m end
+	end
+	return w, { source = "flbis", from = from, upTo = band[1], ours = ours }
+end
+
+local bandCache = setmetatable({}, { __mode = "k" }) -- band -> { weights, info }
+
+-- The spec's weights at `level`: its first band whose highest level reaches
+-- it (the last band past the end), in Polestar's keys.
+-- -> weights, info { source = "flbis", from, upTo, ours = { [key] = true } } | nil
+function Gear.BandFor(class, key, level)
+	local spec = Gear.WEIGHT_BANDS[class] and Gear.WEIGHT_BANDS[class][key]
+	if not spec or #spec < 2 then return nil end
+	local i, from = #spec, 1
+	for j = 2, #spec do
+		if level <= spec[j][1] then
+			i = j
+			break
+		end
+		from = spec[j][1] + 1
+	end
+	if i == #spec and level > spec[i][1] then from = (spec[i - 1] and type(spec[i - 1]) == "table" and spec[i - 1][1] + 1) or 1 end
+	local band = spec[i]
+	local c = bandCache[band]
+	if not c then
+		local w, info = readBand(class, key, spec, band, from)
+		c = { w, info }
+		bandCache[band] = c
+	end
+	return c[1], c[2]
+end
 
 -- Armor and weapon proficiencies (Forever trainers; weapon skills a class
 -- can train count as usable). Armor subclasses: 1 cloth, 2 leather, 3 mail,

@@ -61,7 +61,7 @@ local function isStat(key)
 end
 
 local function isSpec(class, spec)
-	return type(class) == "string" and type(spec) == "string" and Gear.WEIGHTS[class] ~= nil and Gear.WEIGHTS[class][spec] ~= nil
+	return type(spec) == "string" and Gear.HasWeights(class, spec)
 end
 
 local function level(lv)
